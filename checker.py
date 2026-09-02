@@ -263,7 +263,8 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
     results = []
 
     tables = soup.find_all("table")
-    print(f"[デバッグ] 見つかったtable数: {len(tables)} / ページ内の○の総数: {html.count('○')}")
+    print(f"[デバッグ] 見つかったtable数: {len(tables)} / "
+          f"ページ内の「空いています」アイコン数: {html.count('空いています')}")
     for table in tables:
         rows = table.find_all("tr")
         if len(rows) < 2:
@@ -274,7 +275,7 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
         dates = []
         for c in header_cells[1:]:
             text = c.get_text(" ", strip=True)
-            m = re.search(r"(\d{1,2})月(\d{1,2})日", text)
+            m = re.search(r"(\d{1,2})\s*月\s*(\d{1,2})\s*日", text)
             if m:
                 month, day = int(m.group(1)), int(m.group(2))
                 year = guess_year_for(month, day, today)
@@ -309,8 +310,10 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
             for d, cell in zip(dates, cells[1:]):
                 if d is None:
                     continue
+                img = cell.find("img")
+                alt_text = (img.get("alt") if img else "") or ""
                 text = cell.get_text(" ", strip=True)
-                if "○" in text:
+                if "空いて" in alt_text:
                     results.append(
                         {
                             "facility": facility_name or "(不明な施設)",
