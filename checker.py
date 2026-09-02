@@ -66,23 +66,39 @@ def send_line_message(text: str) -> None:
         print("LINE通知に失敗しました:", res.status_code, res.text)
 
 
+def save_debug(page, label: str) -> None:
+    """デバッグ用に、その時点の画面のHTMLとスクリーンショットを保存する"""
+    try:
+        os.makedirs("debug", exist_ok=True)
+        with open(f"debug/{label}.html", "w", encoding="utf-8") as f:
+            f.write(page.content())
+        page.screenshot(path=f"debug/{label}.png", full_page=True)
+    except Exception as e:
+        print(f"[警告] デバッグ保存({label})に失敗しました: {e}")
+
+
 def navigate_to_results(page):
     """トップページから検索結果一覧までクリックで進む"""
     page.goto(BASE_URL)
     page.get_by_text("ログインせずに空き状況を検索", exact=False).first.click()
     page.wait_for_load_state("networkidle")
+    save_debug(page, "0a_after_guest_search")
 
     page.get_by_text("利用目的で検索", exact=False).first.click()
     page.wait_for_load_state("networkidle")
+    save_debug(page, "0b_after_purpose_search")
 
     page.get_by_text(PURPOSE_CATEGORY, exact=True).first.click()
     page.wait_for_load_state("networkidle")
+    save_debug(page, "0c_after_category")
 
     page.get_by_text(PURPOSE_ITEM, exact=True).first.click()
     page.wait_for_load_state("networkidle")
+    save_debug(page, "0d_after_item")
 
     page.get_by_text("選択した条件で次へ", exact=False).first.click()
     page.wait_for_load_state("networkidle")
+    save_debug(page, "0e_facility_list")
 
 
 def _normalize(text: str) -> str:
@@ -128,8 +144,21 @@ def select_facilities(page):
     if checked_labels:
         print(f"[情報] チェックを入れた施設: {', '.join(checked_labels)}")
 
-    page.get_by_text("選択した施設で検索", exact=False).first.click()
-    page.wait_for_load_state("networkidle")
+    save_debug(page, "1_facilities_checked")
+
+    try:
+        page.get_by_text("選択した施設で検索", exact=False).first.click()
+    except Exception as e:
+        print(f"[警告] 「選択した施設で検索」のクリックに失敗しました: {e}")
+
+    save_debug(page, "2_after_search_click")
+
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
+    except Exception as e:
+        print(f"[警告] ページ読み込み待機でタイムアウトしました: {e}")
+
+    save_debug(page, "3_after_wait")
 
 
 def try_expand_to_31_days(page):
@@ -268,15 +297,7 @@ def main():
         navigate_to_results(page)
         select_facilities(page)
         try_expand_to_31_days(page)
-
-        # デバッグ用: 実際に見えている画面のHTMLとスクリーンショットを保存しておく
-        try:
-            os.makedirs("debug", exist_ok=True)
-            with open("debug/page.html", "w", encoding="utf-8") as f:
-                f.write(page.content())
-            page.screenshot(path="debug/page.png", full_page=True)
-        except Exception as e:
-            print(f"[警告] デバッグ用保存に失敗しました: {e}")
+        save_debug(page, "4_before_parse")
 
         all_slots = []
         days_covered = 0
