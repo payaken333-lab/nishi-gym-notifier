@@ -294,10 +294,25 @@ def main():
         browser = p.chromium.launch(headless=True)
         page = browser.new_page()
 
+        console_logs = []
+        page.on("console", lambda msg: console_logs.append(f"[console:{msg.type}] {msg.text}"))
+        page.on("pageerror", lambda err: console_logs.append(f"[pageerror] {err}"))
+        page.on("dialog", lambda dialog: (
+            console_logs.append(f"[dialog:{dialog.type}] {dialog.message}"),
+            dialog.accept(),
+        ))
+
         navigate_to_results(page)
         select_facilities(page)
         try_expand_to_31_days(page)
         save_debug(page, "4_before_parse")
+
+        try:
+            os.makedirs("debug", exist_ok=True)
+            with open("debug/console.log", "w", encoding="utf-8") as f:
+                f.write("\n".join(console_logs) if console_logs else "(何も記録されませんでした)")
+        except Exception as e:
+            print(f"[警告] コンソールログの保存に失敗しました: {e}")
 
         all_slots = []
         days_covered = 0
