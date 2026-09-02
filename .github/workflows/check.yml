@@ -25,3 +25,11 @@ jobs:
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
         run: python checker.py
+
+      - name: デバッグ情報のアップロード
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-info
+          path: debug/
+          retention-days: 3
