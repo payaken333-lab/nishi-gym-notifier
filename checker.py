@@ -165,6 +165,7 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
     results = []
 
     tables = soup.find_all("table")
+    print(f"[デバッグ] 見つかったtable数: {len(tables)} / ページ内の○の総数: {html.count('○')}")
     for table in tables:
         rows = table.find_all("tr")
         if len(rows) < 2:
@@ -267,6 +268,15 @@ def main():
         navigate_to_results(page)
         select_facilities(page)
         try_expand_to_31_days(page)
+
+        # デバッグ用: 実際に見えている画面のHTMLとスクリーンショットを保存しておく
+        try:
+            os.makedirs("debug", exist_ok=True)
+            with open("debug/page.html", "w", encoding="utf-8") as f:
+                f.write(page.content())
+            page.screenshot(path="debug/page.png", full_page=True)
+        except Exception as e:
+            print(f"[警告] デバッグ用保存に失敗しました: {e}")
 
         all_slots = []
         days_covered = 0
