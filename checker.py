@@ -200,8 +200,19 @@ def select_facilities(page):
     save_debug(page, "3_after_wait")
 
 
+def _max_table_columns(page) -> int:
+    """ページ内の表の中で、一番列数が多いものの列数を返す(表示日数の判定用)"""
+    try:
+        return page.evaluate(
+            "Math.max(0, ...Array.from(document.querySelectorAll('table')).map("
+            "t => { const tr = t.querySelector('tr'); return tr ? tr.children.length : 0; }))"
+        )
+    except Exception:
+        return 0
+
+
 def try_expand_to_31_days(page):
-    """表示切替を31日間にして、反映ボタンまで押す(クリック+JS直接送信の両方を試す)"""
+    """表示切替を31日間にして、反映ボタンまで押す(必要な場合だけ直接送信も試す)"""
     try:
         page.get_by_text("31日間", exact=True).first.click()
     except Exception as e:
@@ -210,23 +221,22 @@ def try_expand_to_31_days(page):
 
     try:
         page.get_by_text("選択した条件で表示", exact=False).first.click()
-        page.wait_for_timeout(800)
+        page.wait_for_load_state("networkidle", timeout=15000)
     except Exception as e:
         print(f"[警告] 「選択した条件で表示」のクリックに失敗しました: {e}")
 
-    # クリックだけでは反映されない(二重送信防止)場合があるため、念のため直接送信もしておく
-    try:
-        page.evaluate(
-            "(() => { const f = document.getElementById('formMain');"
-            " if (f) { f.action.value = 'Setup'; f.submit(); } })()"
-        )
-    except Exception as e:
-        print(f"[警告] 表示切替フォームの直接送信に失敗しました: {e}")
-
-    try:
-        page.wait_for_load_state("networkidle", timeout=15000)
-    except Exception:
-        pass
+    # 列数が8(時間帯列+7日)以下のままなら、まだ7日間表示のまま変わっていないと判断し、
+    # フォームを直接送信して反映を試みる(二重送信を避けるため、必要な時だけ実行)
+    if _max_table_columns(page) <= 8:
+        print("[情報] 表示切替クリックで反映されなかったため、フォームを直接送信します。")
+        try:
+            page.evaluate(
+                "(() => { const f = document.getElementById('formMain');"
+                " if (f) { f.action.value = 'Setup'; f.submit(); } })()"
+            )
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception as e:
+            print(f"[警告] 表示切替フォームの直接送信に失敗しました: {e}")
 
 
 def guess_year_for(month: int, day: int, today: date) -> int:
