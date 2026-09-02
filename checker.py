@@ -21,9 +21,11 @@
 ログイン用の利用者番号・パスワードは不要(空き照会はゲストで可能なため)。
 """
 
+import json
+import os
 import re
 import sys
-from datetime import date
+from datetime import date, datetime, time as dtime, timedelta, timezone
 
 import jpholiday
 import requests
@@ -38,12 +40,44 @@ from config import (
     DAYS_AHEAD,
 )
 
-import os
-
 BASE_URL = "https://yoyaku-nishi.growone.net/sportsnet/Welcome.cgi"
+SEEN_FILE = "seen_slots.json"
+
+JST = timezone(timedelta(hours=9))
+ACTIVE_START = dtime(6, 45)   # この時刻以降にチェックを行う
+ACTIVE_END = dtime(23, 0)     # この時刻以降はチェックを行わない
+
+
+def is_within_active_hours() -> bool:
+    """日本時間で 06:45〜23:00 の間かどうか"""
+    now_jst = datetime.now(JST).time()
+    return ACTIVE_START <= now_jst < ACTIVE_END
 
 LINE_CHANNEL_TOKEN = os.environ.get("LINE_CHANNEL_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
+
+
+def slot_key(slot: dict) -> str:
+    """空きコマを一意に表す文字列(施設+日付+時間帯)"""
+    return f"{slot['facility']}|{slot['date']}|{slot['time_slot']}"
+
+
+def load_seen_keys() -> set:
+    """前回までに通知済みの空きコマ一覧を読み込む"""
+    try:
+        with open(SEEN_FILE, encoding="utf-8") as f:
+            return set(json.load(f))
+    except Exception:
+        return set()
+
+
+def save_seen_keys(keys: set) -> None:
+    """今回時点で空いているコマ一覧を保存する(次回との比較用)"""
+    try:
+        with open(SEEN_FILE, "w", encoding="utf-8") as f:
+            json.dump(sorted(keys), f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        print(f"[警告] {SEEN_FILE} の保存に失敗しました: {e}")
 
 
 def send_line_message(text: str) -> None:
@@ -362,6 +396,10 @@ def matches_watch_conditions(slot: dict) -> bool:
 
 
 def main():
+    if not is_within_active_hours():
+        print("[情報] 現在は監視対象外の時間帯(23:00〜06:45)のため、チェックをスキップします。")
+        return
+
     today = date.today()
 
     with sync_playwright() as p:
@@ -409,14 +447,20 @@ def main():
         browser.close()
 
     hits = [s for s in all_slots if matches_watch_conditions(s)]
+    current_keys = {slot_key(s) for s in hits}
+    seen_keys = load_seen_keys()
 
-    if hits:
-        lines = ["🏸 空きが見つかりました!"]
-        for s in hits:
+    new_hits = [s for s in hits if slot_key(s) not in seen_keys]
+
+    if new_hits:
+        lines = ["🏸 新しい空きが見つかりました!"]
+        for s in new_hits:
             lines.append(f"{s['facility']} / {s['date']} / {s['time_slot']}")
         send_line_message("\n".join(lines))
     else:
-        print(f"該当する空きはありませんでした。(チェックしたコマ数: {len(all_slots)})")
+        print(f"新しい空きはありませんでした。(現在の該当コマ数: {len(current_keys)} / 全チェック数: {len(all_slots)})")
+
+    save_seen_keys(current_keys)
 
 
 if __name__ == "__main__":
