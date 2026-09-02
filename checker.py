@@ -201,10 +201,30 @@ def select_facilities(page):
 
 
 def try_expand_to_31_days(page):
-    """表示切替を31日間にする(あれば)"""
+    """表示切替を31日間にして、反映ボタンまで押す(クリック+JS直接送信の両方を試す)"""
     try:
         page.get_by_text("31日間", exact=True).first.click()
-        page.wait_for_load_state("networkidle")
+    except Exception as e:
+        print(f"[警告] 「31日間」の選択に失敗しました: {e}")
+        return
+
+    try:
+        page.get_by_text("選択した条件で表示", exact=False).first.click()
+        page.wait_for_timeout(800)
+    except Exception as e:
+        print(f"[警告] 「選択した条件で表示」のクリックに失敗しました: {e}")
+
+    # クリックだけでは反映されない(二重送信防止)場合があるため、念のため直接送信もしておく
+    try:
+        page.evaluate(
+            "(() => { const f = document.getElementById('formMain');"
+            " if (f) { f.action.value = 'Setup'; f.submit(); } })()"
+        )
+    except Exception as e:
+        print(f"[警告] 表示切替フォームの直接送信に失敗しました: {e}")
+
+    try:
+        page.wait_for_load_state("networkidle", timeout=15000)
     except Exception:
         pass
 
@@ -252,7 +272,9 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
             else:
                 dates.append(None)
 
-        # このテーブルがどの施設のものかを、直前のテキストから推定する
+        # このテーブルがどの施設のものかを、直前のテキストから推定する。
+        # 「体育室半面」は4施設共通の文言で判定材料にならないため、
+        # 施設名そのもの(先頭の部分)だけで判定する。
         facility_name = None
         for prev in table.find_all_previous(string=True):
             prev_text = prev.strip()
@@ -260,8 +282,8 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
                 continue
             prev_norm = _normalize(prev_text)
             for target in TARGET_FACILITIES:
-                target_norm = _normalize(target)
-                if prev_norm and (prev_norm in target_norm or target_norm in prev_norm):
+                facility_only = _normalize(target.split("　")[0])
+                if facility_only and facility_only in prev_norm:
                     facility_name = target
                     break
             if facility_name:
