@@ -146,6 +146,19 @@ def select_facilities(page):
 
     save_debug(page, "1_facilities_checked")
 
+    # デバッグ用: 検索ボタンが呼び出すJS関数の中身を直接のぞいておく
+    try:
+        func_src = page.evaluate(
+            "typeof isSubmitDataSet !== 'undefined' ? isSubmitDataSet.toString() : '(isSubmitDataSet is not defined)'"
+        )
+        checked_count = page.evaluate(
+            "document.querySelectorAll('input[type=checkbox]:checked').length"
+        )
+        with open("debug/isSubmitDataSet.js", "w", encoding="utf-8") as f:
+            f.write(f"// checked checkboxes: {checked_count}\n\n{func_src}")
+    except Exception as e:
+        print(f"[警告] JS関数の取得に失敗しました: {e}")
+
     try:
         page.get_by_text("選択した施設で検索", exact=False).first.click()
     except Exception as e:
