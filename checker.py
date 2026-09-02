@@ -151,20 +151,46 @@ def select_facilities(page):
         func_src = page.evaluate(
             "typeof isSubmitDataSet !== 'undefined' ? isSubmitDataSet.toString() : '(isSubmitDataSet is not defined)'"
         )
+        ignore_check_src = page.evaluate(
+            "typeof isIgnoreCheck !== 'undefined' ? isIgnoreCheck.toString() : '(isIgnoreCheck is not defined)'"
+        )
         checked_count = page.evaluate(
             "document.querySelectorAll('input[type=checkbox]:checked').length"
         )
         with open("debug/isSubmitDataSet.js", "w", encoding="utf-8") as f:
-            f.write(f"// checked checkboxes: {checked_count}\n\n{func_src}")
+            f.write(
+                f"// checked checkboxes: {checked_count}\n\n"
+                f"{func_src}\n\n// --- isIgnoreCheck ---\n\n{ignore_check_src}"
+            )
     except Exception as e:
         print(f"[警告] JS関数の取得に失敗しました: {e}")
 
     try:
         page.get_by_text("選択した施設で検索", exact=False).first.click()
+        page.wait_for_timeout(1000)
     except Exception as e:
         print(f"[警告] 「選択した施設で検索」のクリックに失敗しました: {e}")
 
     save_debug(page, "2_after_search_click")
+
+    # クリックだけで画面が進まない場合(二重送信チェック等)への保険:
+    # フォームを直接送信してみる
+    still_same_page = False
+    try:
+        still_same_page = page.get_by_text("選択した施設で検索", exact=False).first.is_visible()
+    except Exception:
+        pass
+
+    if still_same_page:
+        print("[情報] 通常のクリックで進まなかったため、フォームを直接送信します。")
+        try:
+            page.evaluate(
+                "(() => { const f = document.getElementById('formMain');"
+                " if (f) { f.action.value = 'Enter'; f.submit(); } })()"
+            )
+            page.wait_for_load_state("networkidle", timeout=15000)
+        except Exception as e:
+            print(f"[警告] フォームの直接送信に失敗しました: {e}")
 
     try:
         page.wait_for_load_state("networkidle", timeout=15000)
