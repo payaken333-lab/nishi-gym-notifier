@@ -33,4 +33,4 @@ WATCH_CONDITIONS = [
 ]
 
 # どのくらい先の日付まで監視するか(日数)
-DAYS_AHEAD = 31
+DAYS_AHEAD = 60
