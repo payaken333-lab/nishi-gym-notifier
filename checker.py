@@ -44,12 +44,12 @@ BASE_URL = "https://yoyaku-nishi.growone.net/sportsnet/Welcome.cgi"
 SEEN_FILE = "seen_slots.json"
 
 JST = timezone(timedelta(hours=9))
-ACTIVE_START = dtime(6, 45)   # この時刻以降にチェックを行う
-ACTIVE_END = dtime(23, 0)     # この時刻以降はチェックを行わない
+ACTIVE_START = dtime(6, 15)   # この時刻以降にチェックを行う
+ACTIVE_END = dtime(24, 0)     # この時刻以降はチェックを行わない
 
 
 def is_within_active_hours() -> bool:
-    """日本時間で 06:45〜23:00 の間かどうか"""
+    """日本時間で 06:15〜24:00 の間かどうか"""
     now_jst = datetime.now(JST).time()
     return ACTIVE_START <= now_jst < ACTIVE_END
 
