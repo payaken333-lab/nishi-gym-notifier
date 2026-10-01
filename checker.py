@@ -446,7 +446,7 @@ def main():
 
         browser.close()
 
-hits = [s for s in all_slots if matches_watch_conditions(s)]
+    hits = [s for s in all_slots if matches_watch_conditions(s)]
 
     # ページ送りの失敗などで同じ枠が重複することがあるため、ここで一本化する
     unique_hits = {}
@@ -455,6 +455,7 @@ hits = [s for s in all_slots if matches_watch_conditions(s)]
     hits = list(unique_hits.values())
 
     current_keys = {slot_key(s) for s in hits}
+
     seen_keys = load_seen_keys()
     new_hits = [s for s in hits if slot_key(s) not in seen_keys]
 
