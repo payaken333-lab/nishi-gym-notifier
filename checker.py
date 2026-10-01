@@ -448,21 +448,10 @@ def main():
             advanced = False
             for attempt in range(3):
                 try:
-                    if attempt == 0:
-                        # 1回目は普通のクリックを試す
-                        page.get_by_text("次の31日分", exact=False).first.click()
-                    else:
-                        # 二重送信防止の仕組み(isSubmitDataSet経由)は一度使うと
-                        # 再読み込みまで使えなくなるため、それを経由せず
-                        # フォームを直接操作して送信する
-                        page.evaluate(
-                            "(() => { const f = document.getElementById('formMain');"
-                            " if (f) { f.action.value = 'OffsetNext'; f.submit(); } })()"
-                        )
+                    page.get_by_text("次の31日分", exact=False).first.click()
                     page.wait_for_load_state("networkidle", timeout=15000)
                     page.wait_for_timeout(500)
-                except Exception as e:
-                    print(f"[警告] 「次の31日分」の実行中にエラー: {e}")
+                except Exception:
                     break
                 try:
                     after_start_date = page.evaluate(
@@ -470,11 +459,10 @@ def main():
                     )
                 except Exception:
                     after_start_date = ""
-                print(f"[デバッグ] 表示開始日: {before_start_date!r} → {after_start_date!r}")
                 if after_start_date and after_start_date != before_start_date:
                     advanced = True
                     break
-                print(f"[情報] 「次の31日分」後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
+                print(f"[情報] 「次の31日分」クリック後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
 
             if not advanced:
                 print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
