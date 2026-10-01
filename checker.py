@@ -438,10 +438,23 @@ def main():
             if days_covered >= DAYS_AHEAD:
                 break
 
-            try:
-                page.get_by_text("次の31日分", exact=False).first.click()
-                page.wait_for_load_state("networkidle")
-            except Exception:
+            before_snapshot = html[:2000]
+            advanced = False
+            for attempt in range(3):
+                try:
+                    page.get_by_text("次の31日分", exact=False).first.click()
+                    page.wait_for_load_state("networkidle", timeout=15000)
+                    page.wait_for_timeout(500)
+                except Exception:
+                    break
+                new_html = page.content()
+                if new_html[:2000] != before_snapshot:
+                    advanced = True
+                    break
+                print(f"[情報] 「次の31日分」クリック後もページが変わらなかったため再試行します ({attempt + 1}回目)")
+
+            if not advanced:
+                print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
                 break
 
         browser.close()
