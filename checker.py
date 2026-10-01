@@ -452,8 +452,13 @@ def main():
                         # 1回目は普通のクリックを試す
                         page.get_by_text("次の31日分", exact=False).first.click()
                     else:
-                        # それでも進まない場合は、クリックに頼らずJS関数を直接呼ぶ
-                        page.evaluate("isSubmitDataSet('OffsetNext')")
+                        # 二重送信防止の仕組み(isSubmitDataSet経由)は一度使うと
+                        # 再読み込みまで使えなくなるため、それを経由せず
+                        # フォームを直接操作して送信する
+                        page.evaluate(
+                            "(() => { const f = document.getElementById('formMain');"
+                            " if (f) { f.action.value = 'OffsetNext'; f.submit(); } })()"
+                        )
                     page.wait_for_load_state("networkidle", timeout=15000)
                     page.wait_for_timeout(500)
                 except Exception as e:
@@ -503,4 +508,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
