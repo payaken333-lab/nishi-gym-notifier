@@ -438,7 +438,13 @@ def main():
             if days_covered >= DAYS_AHEAD:
                 break
 
-            before_snapshot = html[:2000]
+            try:
+                before_start_date = page.evaluate(
+                    "document.getElementById('startDate') ? document.getElementById('startDate').value : ''"
+                )
+            except Exception:
+                before_start_date = ""
+
             advanced = False
             for attempt in range(3):
                 try:
@@ -447,11 +453,16 @@ def main():
                     page.wait_for_timeout(500)
                 except Exception:
                     break
-                new_html = page.content()
-                if new_html[:2000] != before_snapshot:
+                try:
+                    after_start_date = page.evaluate(
+                        "document.getElementById('startDate') ? document.getElementById('startDate').value : ''"
+                    )
+                except Exception:
+                    after_start_date = ""
+                if after_start_date and after_start_date != before_start_date:
                     advanced = True
                     break
-                print(f"[情報] 「次の31日分」クリック後もページが変わらなかったため再試行します ({attempt + 1}回目)")
+                print(f"[情報] 「次の31日分」クリック後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
 
             if not advanced:
                 print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
