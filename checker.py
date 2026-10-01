@@ -455,7 +455,6 @@ hits = [s for s in all_slots if matches_watch_conditions(s)]
     hits = list(unique_hits.values())
 
     current_keys = {slot_key(s) for s in hits}
-
     seen_keys = load_seen_keys()
     new_hits = [s for s in hits if slot_key(s) not in seen_keys]
 
