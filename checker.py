@@ -459,6 +459,7 @@ def main():
                     )
                 except Exception:
                     after_start_date = ""
+                print(f"[デバッグ] 表示開始日: {before_start_date!r} → {after_start_date!r}")
                 if after_start_date and after_start_date != before_start_date:
                     advanced = True
                     break
