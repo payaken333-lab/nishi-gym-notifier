@@ -448,10 +448,16 @@ def main():
             advanced = False
             for attempt in range(3):
                 try:
-                    page.get_by_text("次の31日分", exact=False).first.click()
+                    if attempt == 0:
+                        # 1回目は普通のクリックを試す
+                        page.get_by_text("次の31日分", exact=False).first.click()
+                    else:
+                        # それでも進まない場合は、クリックに頼らずJS関数を直接呼ぶ
+                        page.evaluate("isSubmitDataSet('OffsetNext')")
                     page.wait_for_load_state("networkidle", timeout=15000)
                     page.wait_for_timeout(500)
-                except Exception:
+                except Exception as e:
+                    print(f"[警告] 「次の31日分」の実行中にエラー: {e}")
                     break
                 try:
                     after_start_date = page.evaluate(
@@ -463,7 +469,7 @@ def main():
                 if after_start_date and after_start_date != before_start_date:
                     advanced = True
                     break
-                print(f"[情報] 「次の31日分」クリック後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
+                print(f"[情報] 「次の31日分」後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
 
             if not advanced:
                 print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
@@ -497,3 +503,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
