@@ -440,7 +440,9 @@ def main():
 
             try:
                 before_start_date = page.evaluate(
-                    "document.getElementById('startDate') ? document.getElementById('startDate').value : ''"
+                    "(() => { const t = document.querySelector('table');"
+                    " if (!t || !t.rows[0] || !t.rows[0].cells[1]) return '';"
+                    " return t.rows[0].cells[1].innerText; })()"
                 )
             except Exception:
                 before_start_date = ""
@@ -466,15 +468,17 @@ def main():
                     break
                 try:
                     after_start_date = page.evaluate(
-                        "document.getElementById('startDate') ? document.getElementById('startDate').value : ''"
+                        "(() => { const t = document.querySelector('table');"
+                        " if (!t || !t.rows[0] || !t.rows[0].cells[1]) return '';"
+                        " return t.rows[0].cells[1].innerText; })()"
                     )
                 except Exception:
                     after_start_date = ""
-                print(f"[デバッグ] 表示開始日: {before_start_date!r} → {after_start_date!r}")
+                print(f"[デバッグ] 日付ヘッダ: {before_start_date!r} → {after_start_date!r}")
                 if after_start_date and after_start_date != before_start_date:
                     advanced = True
                     break
-                print(f"[情報] 「次の31日分」後も表示開始日が変わらなかったため再試行します ({attempt + 1}回目)")
+                print(f"[情報] 「次の31日分」後も日付ヘッダが変わらなかったため再試行します ({attempt + 1}回目)")
 
             if not advanced:
                 print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
