@@ -24,11 +24,11 @@ TARGET_FACILITIES = [
 WATCH_CONDITIONS = [
     {
         "type": "weekday",
-        "time_slots": ["19:00-21:00", "20:00-22:00"],
+        "time_slots": ["18:00-20:00","19:00-21:00", "20:00-22:00"],
     },
     {
         "type": "holiday",
-        "time_range": ("09:00", "19:00"),
+        "time_range": ("08:00", "19:00"),
     },
 ]
 
