@@ -180,7 +180,6 @@ def select_facilities(page):
 
     save_debug(page, "1_facilities_checked")
 
-    # デバッグ用: 検索ボタンが呼び出すJS関数の中身を直接のぞいておく
     try:
         func_src = page.evaluate(
             "typeof isSubmitDataSet !== 'undefined' ? isSubmitDataSet.toString() : '(isSubmitDataSet is not defined)'"
@@ -207,8 +206,6 @@ def select_facilities(page):
 
     save_debug(page, "2_after_search_click")
 
-    # クリックだけで画面が進まない場合(二重送信チェック等)への保険:
-    # フォームを直接送信してみる
     still_same_page = False
     try:
         still_same_page = page.get_by_text("選択した施設で検索", exact=False).first.is_visible()
@@ -259,8 +256,6 @@ def try_expand_to_31_days(page):
     except Exception as e:
         print(f"[警告] 「選択した条件で表示」のクリックに失敗しました: {e}")
 
-    # 列数が8(時間帯列+7日)以下のままなら、まだ7日間表示のまま変わっていないと判断し、
-    # フォームを直接送信して反映を試みる(二重送信を避けるため、必要な時だけ実行)
     if _max_table_columns(page) <= 8:
         print("[情報] 表示切替クリックで反映されなかったため、フォームを直接送信します。")
         try:
@@ -287,11 +282,6 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
     """
     ページ全体のHTMLから、施設ごとのカレンダー表を探して
     空き(○)のマスを抽出する。
-
-    サイトの正確なタグ名・class名が不明なため、
-    「テーブルを見つけて、その直前に出てくる施設名っぽいテキストを探す」
-    というヒューリスティックで実装している。
-    実際の出力がずれる場合は、workflow実行結果のログを見て調整する。
     """
     soup = BeautifulSoup(html, "html.parser")
     results = []
@@ -304,7 +294,6 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
         if len(rows) < 2:
             continue
 
-        # ヘッダ行から日付を取得(1列目は時間帯なので2列目以降)
         header_cells = rows[0].find_all(["th", "td"])
         dates = []
         for c in header_cells[1:]:
@@ -317,9 +306,6 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
             else:
                 dates.append(None)
 
-        # このテーブルがどの施設のものかを、直前のテキストから推定する。
-        # 「体育室半面」は4施設共通の文言で判定材料にならないため、
-        # 施設名そのもの(先頭の部分)だけで判定する。
         facility_name = None
         for prev in table.find_all_previous(string=True):
             prev_text = prev.strip()
@@ -448,7 +434,8 @@ def main():
                 before_start_date = ""
 
             advanced = False
-            for attempt in range(3):
+            max_attempts = 8
+            for attempt in range(max_attempts):
                 try:
                     if attempt == 0:
                         # 1回目は普通のクリックを試す
@@ -462,7 +449,8 @@ def main():
                             " if (f) { f.action.value = 'OffsetNext'; f.submit(); } })()"
                         )
                     page.wait_for_load_state("networkidle", timeout=15000)
-                    page.wait_for_timeout(500)
+                    # 試行回数が増えるほど少し長めに待つ(遅延が原因の失敗に備える)
+                    page.wait_for_timeout(500 + attempt * 300)
                 except Exception as e:
                     print(f"[警告] 「次の31日分」の実行中にエラー: {e}")
                     break
@@ -481,14 +469,13 @@ def main():
                 print(f"[情報] 「次の31日分」後も日付ヘッダが変わらなかったため再試行します ({attempt + 1}回目)")
 
             if not advanced:
-                print("[警告] 「次の31日分」への移動に失敗しました。ここで打ち切ります。")
+                print(f"[警告] 「次の31日分」への移動に{max_attempts}回失敗しました。ここで打ち切ります。")
                 break
 
         browser.close()
 
     hits = [s for s in all_slots if matches_watch_conditions(s)]
 
-    # ページ送りの失敗などで同じ枠が重複することがあるため、ここで一本化する
     unique_hits = {}
     for s in hits:
         unique_hits[slot_key(s)] = s
