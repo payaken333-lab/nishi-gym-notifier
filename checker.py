@@ -508,6 +508,11 @@ def main():
     else:
         print(f"新しい空きはありませんでした。(現在の該当コマ数: {len(current_keys)} / 全チェック数: {len(all_slots)})")
 
+    if COVERED_UNTIL:
+        print(f"[結果] チェック範囲: 〜{COVERED_UNTIL.month}/{COVERED_UNTIL.day}")
+    else:
+        print("[結果] チェック範囲: 取得できませんでした")
+
     save_seen_keys(current_keys)
 
 
