@@ -46,6 +46,9 @@ SEEN_FILE = "seen_slots.json"
 JST = timezone(timedelta(hours=9))
 ACTIVE_START = dtime(6, 15)   # この時刻以降にチェックを行う
 
+# 今回の実行で、カレンダーの日付ヘッダとして読み取れた一番遠い日付
+COVERED_UNTIL = None
+
 
 def is_within_active_hours() -> bool:
     """日本時間で 06:15〜24:00(実質、夜だけ休む)かどうか"""
@@ -302,7 +305,11 @@ def parse_calendar_html(html: str, today: date) -> list[dict]:
             if m:
                 month, day = int(m.group(1)), int(m.group(2))
                 year = guess_year_for(month, day, today)
-                dates.append(date(year, month, day))
+                d_obj = date(year, month, day)
+                dates.append(d_obj)
+                global COVERED_UNTIL
+                if COVERED_UNTIL is None or d_obj > COVERED_UNTIL:
+                    COVERED_UNTIL = d_obj
             else:
                 dates.append(None)
 
@@ -362,6 +369,11 @@ def matches_watch_conditions(slot: dict) -> bool:
     slot_start, slot_end = m.group(1), m.group(2)
 
     for cond in WATCH_CONDITIONS:
+        # 施設を限定した条件の場合は、その施設の枠だけに適用する
+        if "facilities" in cond:
+            if not any(slot["facility"].startswith(name) for name in cond["facilities"]):
+                continue
+
         if cond["type"] == "weekday" and not is_business_day:
             continue
         if cond["type"] == "holiday" and is_business_day:
@@ -490,6 +502,8 @@ def main():
         lines = ["🏸 新しい空きが見つかりました!"]
         for s in new_hits:
             lines.append(f"{s['facility']} / {s['date']} / {s['time_slot']}")
+        if COVERED_UNTIL:
+            lines.append(f"(チェック範囲: 〜{COVERED_UNTIL.month}/{COVERED_UNTIL.day})")
         send_line_message("\n".join(lines))
     else:
         print(f"新しい空きはありませんでした。(現在の該当コマ数: {len(current_keys)} / 全チェック数: {len(all_slots)})")
