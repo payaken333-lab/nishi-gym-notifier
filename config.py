@@ -22,4 +22,16 @@ TARGET_FACILITIES = [
 # type: "weekday" = 平日(月〜金、祝日を除く) / "holiday" = 土日祝
 # time_slots: このリストと完全一致する時間帯だけを対象にする(平日用)
 # time_range: (開始, 終了) の範囲に収まる時間帯を全部対象にする(土日祝用)
-# ※ 施設ごとに条件を変えたい時は、条件の中に "facilities": ["松原体育館"] のように書く
+WATCH_CONDITIONS = [
+    {
+        "type": "weekday",
+        "time_slots": ["18:00-20:00", "19:00-21:00", "20:00-22:00"],
+    },
+    {
+        "type": "holiday",
+        "time_range": ("08:00", "19:00"),
+    },
+]
+
+# どのくらい先の日付まで監視するか(日数)
+DAYS_AHEAD = 60
