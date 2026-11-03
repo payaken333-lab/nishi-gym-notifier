@@ -446,7 +446,7 @@ def main():
                 before_start_date = ""
 
             advanced = False
-            max_attempts = 8
+            max_attempts = 3
             for attempt in range(max_attempts):
                 try:
                     if attempt == 0:
