@@ -65,29 +65,35 @@ def slot_key(slot: dict) -> str:
     return f"{slot['facility']}|{slot['date']}|{slot['time_slot']}"
 
 
-def load_seen_keys() -> set:
-    """前回までに通知済みの空きコマ一覧を読み込む"""
+RENOTIFY_COOLDOWN_SEC = 24 * 60 * 60  # 一度通知した枠は、消えて再び空いても24時間は再通知しない
+
+
+def load_seen_keys() -> dict:
+    """通知済みの枠 {枠キー: 通知した時刻(epoch秒)} を読み込む(旧形式のリストは無視)"""
     try:
         with open(SEEN_FILE, encoding="utf-8") as f:
-            return set(json.load(f))
+            data = json.load(f)
+        if isinstance(data, dict):
+            return {str(k): float(v) for k, v in data.items()}
     except Exception:
-        return set()
+        pass
+    return {}
 
 
-def save_seen_keys(keys: set) -> None:
-    """今回時点で空いているコマ一覧を保存する(次回との比較用)"""
+def save_seen_keys(store: dict) -> None:
+    """通知済みの枠と通知時刻を保存する"""
     try:
         with open(SEEN_FILE, "w", encoding="utf-8") as f:
-            json.dump(sorted(keys), f, ensure_ascii=False, indent=2)
+            json.dump(dict(sorted(store.items())), f, ensure_ascii=False, indent=2)
     except Exception as e:
         print(f"[警告] {SEEN_FILE} の保存に失敗しました: {e}")
 
 
-def send_line_message(text: str) -> None:
+def send_line_message(text: str) -> bool:
     """LINE Messaging API で自分に通知を送る"""
     if not LINE_CHANNEL_TOKEN or not LINE_USER_ID:
         print("LINEの設定が未登録のため通知をスキップしました:\n", text)
-        return
+        return False
 
     url = "https://api.line.me/v2/bot/message/push"
     headers = {
@@ -98,9 +104,15 @@ def send_line_message(text: str) -> None:
         "to": LINE_USER_ID,
         "messages": [{"type": "text", "text": text}],
     }
-    res = requests.post(url, headers=headers, json=payload, timeout=10)
+    try:
+        res = requests.post(url, headers=headers, json=payload, timeout=10)
+    except Exception as e:
+        print("LINE通知に失敗しました:", e)
+        return False
     if res.status_code != 200:
         print("LINE通知に失敗しました:", res.status_code, res.text)
+        return False
+    return True
 
 
 def save_debug(page, label: str) -> None:
@@ -495,16 +507,21 @@ def main():
 
     current_keys = {slot_key(s) for s in hits}
 
-    seen_keys = load_seen_keys()
-    new_hits = [s for s in hits if slot_key(s) not in seen_keys]
+    now_ts = datetime.now(timezone.utc).timestamp()
+    store = load_seen_keys()
+    # いま空いている枠、または通知から24時間以内の枠は「通知済み」として扱う
+    store = {k: t for k, t in store.items() if k in current_keys or now_ts - t < RENOTIFY_COOLDOWN_SEC}
+    new_hits = [s for s in hits if slot_key(s) not in store]
 
+    notify_failed = False
     if new_hits:
         lines = ["🏸 新しい空きが見つかりました!"]
         for s in new_hits:
             lines.append(f"{s['facility']} / {s['date']} / {s['time_slot']}")
         if COVERED_UNTIL:
             lines.append(f"(チェック範囲: 〜{COVERED_UNTIL.month}/{COVERED_UNTIL.day})")
-        send_line_message("\n".join(lines))
+        if not send_line_message("\n".join(lines)):
+            notify_failed = True
     else:
         print(f"新しい空きはありませんでした。(現在の該当コマ数: {len(current_keys)} / 全チェック数: {len(all_slots)})")
 
@@ -513,7 +530,12 @@ def main():
     else:
         print("[結果] チェック範囲: 取得できませんでした")
 
-    save_seen_keys(current_keys)
+    if new_hits and not notify_failed:
+        for s_ in new_hits:
+            store[slot_key(s_)] = now_ts
+    elif notify_failed:
+        print("[警告] 通知に失敗したため、これらの枠は次回再通知します")
+    save_seen_keys(store)
 
 
 if __name__ == "__main__":
