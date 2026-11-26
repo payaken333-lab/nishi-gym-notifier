@@ -58,6 +58,7 @@ def is_within_active_hours() -> bool:
 
 LINE_CHANNEL_TOKEN = os.environ.get("LINE_CHANNEL_TOKEN")
 LINE_USER_ID = os.environ.get("LINE_USER_ID")
+NTFY_TOPIC = os.environ.get("NTFY_TOPIC")
 
 
 def slot_key(slot: dict) -> str:
@@ -112,6 +113,27 @@ def send_line_message(text: str) -> bool:
     if res.status_code != 200:
         print("LINE通知に失敗しました:", res.status_code, res.text)
         return False
+    return True
+
+
+def send_ntfy_message(text: str) -> bool:
+    """ntfy(予備の通知先)で送る。LINEが失敗したときに使う"""
+    if not NTFY_TOPIC:
+        return False
+    try:
+        res = requests.post(
+            f"https://ntfy.sh/{NTFY_TOPIC}",
+            data=text.encode("utf-8"),
+            headers={"Priority": "high"},
+            timeout=10,
+        )
+    except Exception as e:
+        print("ntfy通知に失敗しました:", e)
+        return False
+    if res.status_code != 200:
+        print("ntfy通知に失敗しました:", res.status_code)
+        return False
+    print("[情報] ntfyで通知しました")
     return True
 
 
@@ -520,8 +542,11 @@ def main():
             lines.append(f"{s['facility']} / {s['date']} / {s['time_slot']}")
         if COVERED_UNTIL:
             lines.append(f"(チェック範囲: 〜{COVERED_UNTIL.month}/{COVERED_UNTIL.day})")
-        if not send_line_message("\n".join(lines)):
-            notify_failed = True
+        message = "\n".join(lines)
+        if not send_line_message(message):
+            # LINEが失敗したらntfyで送る。両方失敗したときだけ「未通知」にする
+            if not send_ntfy_message(message):
+                notify_failed = True
     else:
         print(f"新しい空きはありませんでした。(現在の該当コマ数: {len(current_keys)} / 全チェック数: {len(all_slots)})")
 
